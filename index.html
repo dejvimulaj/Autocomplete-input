@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autocomplete Multi-Select</title>
+    <link rel="stylesheet" href="index.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+</head>
+<body>
+    <div class="autocomplete-container">
+        <div class="input-box" id="inputBox">
+            <input type="text" id="autocompleteInput" placeholder="Search..." autocomplete="off">
+            <i class="fa fa-search search-icon"></i>
+        </div>
+        <ul class="options-list" id="optionsList"></ul>
+
+        <!-- Filter Checkbox -->
+        <div class="filter-container">
+            <label class="checkbox-container">
+                <input type="checkbox" id="filterCheckbox">
+                <span class="checkmark"></span> Selected Items Only
+            </label>
+        </div>
+    </div>
+
+    <!-- Data Grid -->
+    <div class="grid-container" id="gridContainer"></div>
+
+    <script src="index.js"></script>
+</body>
+</html>
+
+
