@@ -73,7 +73,7 @@ html, body {
     border: 2px solid #508C9B;
     border-top: none;
     position: absolute;
-    width: 500px;
+    width: 496px;
     background: #EEEEEE;
     display: none;
     overflow-y: auto;
@@ -198,6 +198,37 @@ html, body {
     color: #508C9B;
 }
 
+
+.filter-settings {
+    display: none;
+    position: absolute;
+    top: 50px;
+    right: 20px;
+    background: #EEEEEE;
+    border: 2px solid #508C9B;
+    border-radius: 0px 0 10px 10px;
+    padding: 10px;
+    box-shadow: 0px 2px 4px #508C9B;
+    width: 250px;
+    z-index: 0;
+}
+
+.filter-settings label {
+    display: flex;
+    align-items: center;
+    padding: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #508C9B;
+}
+
+.filter-settings input[type="radio"] {
+    accent-color: #508C9B;
+    margin-right: 5px;
+    cursor: pointer;
+}
+
+
 @media screen and (max-width: 500px) {
     .autocomplete-container {
         width: 95%; 
@@ -241,4 +272,16 @@ html, body {
     .card p {
         font-size: 12px;
     }
+    
+    .filter-settings{
+        display: none;
+        position: absolute;
+        top: 45px;
+    }
+
+    .filter-settings label {
+        font-size: 12px;
+        padding: 6px; 
+    }
+
 }

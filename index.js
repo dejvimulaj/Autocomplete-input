@@ -26,6 +26,21 @@ let selectedTags = { color: [], shape: [] };
 let selectedNames = [];
 let currentIndex = -1;
 
+const filterIcon = document.getElementById("filterIcon");
+const filterSettings = document.getElementById("filterSettings");
+let filterMode = "strict"; 
+
+filterIcon.addEventListener("click", () => {
+    filterSettings.style.display = filterSettings.style.display === "block" ? "none" : "block";
+});
+
+document.querySelectorAll("input[name='filterMode']").forEach(input => {
+    input.addEventListener("change", (e) => {
+        filterMode = e.target.value;
+        displayGrid();
+    });
+});
+
 const colors = [...new Set(data.map(item => item.color))];
 const shapes = [...new Set(data.map(item => item.shape))];
 
@@ -44,10 +59,17 @@ const displayGrid = () => {
         const shapeMatch = selectedTags.shape.length === 0 || selectedTags.shape.includes(item.shape);
 
       
-        return selectedNames.length === 0 && selectedTags.color.length === 0 && selectedTags.shape.length === 0
-            ? true
-            : nameMatch && colorMatch && shapeMatch;
+        if (selectedNames.length === 0 && selectedTags.color.length === 0 && selectedTags.shape.length === 0) {
+            return true; // Show all items initially
+        }
+
+        if (filterMode === "strict") {
+            return nameMatch && colorMatch && shapeMatch;
+        } else {
+            return nameMatch || (colorMatch && shapeMatch);
+        }
     });
+    
     filteredData.forEach(item => {
         const card = document.createElement("div");
         card.classList.add("card");
@@ -176,41 +198,80 @@ const updateActiveItem = (listItems) => {
 input.addEventListener("keydown", function (e) {
     const listItems = optionsList.querySelectorAll("li");
 
-        if (e.key === "ArrowDown") {
-            e.preventDefault();
-            if (currentIndex < listItems.length - 1) {
-                currentIndex++;
-            } else {
-                currentIndex = 0;
-            }
-            updateActiveItem(listItems);
-        } else if (e.key === "ArrowUp") {
-            e.preventDefault();
-            if (currentIndex > 0) {
-                currentIndex--;
-            } else {
-                currentIndex = listItems.length - 1;
-            }
-            updateActiveItem(listItems);
-        } else if (e.key === "Enter") {
-            e.preventDefault();
-            if (currentIndex >= 0 && listItems[currentIndex]) {
-                listItems[currentIndex].click();
-            }
+    if (e.key === "ArrowDown") {
+        e.preventDefault();
+        currentIndex = (currentIndex < listItems.length - 1) ? currentIndex + 1 : 0;
+        updateActiveItem(listItems);
+    } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        currentIndex = (currentIndex > 0) ? currentIndex - 1 : listItems.length - 1;
+        updateActiveItem(listItems);
+    } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (currentIndex >= 0 && listItems[currentIndex]) {
+            listItems[currentIndex].click();
+        } else {
+            handleInvalidInput(input.value)
         }
-      else if (e.key === "Backspace" && input.value === "") {
+    } else if (e.key === "Backspace" && input.value === "") {
         const lastTag = inputBox.querySelector(".tag:last-of-type");
         if (lastTag) {
-            const lastItem = selectedTags[selectedTags.length - 1];
-            // console.log(lastItem)
-            if (lastItem) {
-                input.value = lastItem.name; 
-                removeTag(lastItem.id, lastTag);
+            const tagText = lastTag.textContent.replace(" ×", "");
+            lastTag.remove();
+
+            if (selectedNames.includes(tagText)) {
+                selectedNames = selectedNames.filter(name => name !== tagText);
+            } else if (selectedTags.color.includes(tagText)) {
+                selectedTags.color = selectedTags.color.filter(color => color !== tagText);
+            } else if (selectedTags.shape.includes(tagText)) {
+                selectedTags.shape = selectedTags.shape.filter(shape => shape !== tagText);
             }
+
+            input.value = tagText;
+            input.focus();
+
+            displayGrid();
         }
     }
-    displayGrid();
 });
+
+const handleInvalidInput = (inputValue) => {
+    if (!inputValue.trim()) return;
+
+    const isNameMatch = data.some(item => item.name.toLowerCase() === inputValue.toLowerCase());
+    const isColorMatch = colors.some(color => color.toLowerCase() === inputValue.toLowerCase());
+    const isShapeMatch = shapes.some(shape => shape.toLowerCase() === inputValue.toLowerCase());
+
+    if (!isNameMatch && !isColorMatch && !isShapeMatch) {
+        showErrorMessage("No match found");
+        input.value = "";
+    }
+};
+
+const searchIcon = document.querySelector(".search-icon"); 
+
+const showErrorMessage = (message) => {
+    let errorDiv = document.getElementById("error-message");
+    
+    if (!errorDiv) {
+        errorDiv = document.createElement("div");
+        errorDiv.id = "error-message";
+        errorDiv.style.color = "red";
+        errorDiv.style.fontSize = "16px";
+        errorDiv.style.fontWeight= "bold";
+        inputBox.appendChild(errorDiv);
+    }
+
+    errorDiv.textContent = message;
+    searchIcon.style.display = "none";
+
+    setTimeout(() => {
+        if (errorDiv) {
+            errorDiv.remove();
+        }
+        searchIcon.style.display = "inline-block";
+    }, 2000);
+};
 
 document.addEventListener("click", function (e) {
     if (!inputBox.contains(e.target)) {

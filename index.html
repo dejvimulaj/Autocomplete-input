@@ -11,9 +11,20 @@
     <div class="autocomplete-container">
         <div class="input-box" id="inputBox">
             <input type="text" id="autocompleteInput" placeholder="Search..." autocomplete="off">
-            <i class="fa fa-search search-icon"></i>
+            <i class="fa fa-filter search-icon" id="filterIcon"></i>
         </div>
         <ul class="options-list" id="optionsList"></ul>
+        
+        <div id="filterSettings" class="filter-settings">
+            <label>
+                <input type="radio" name="filterMode" value="strict" checked>
+                Strict Mode (AND condition)
+            </label>
+            <label>
+                <input type="radio" name="filterMode" value="flexible">
+                Flexible Mode (OR condition)
+            </label>
+        </div>
 
         <!-- Filter Checkbox -->
         <div class="filter-container">
