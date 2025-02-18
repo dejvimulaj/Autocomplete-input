@@ -73,7 +73,7 @@ html, body {
     border: 2px solid #508C9B;
     border-top: none;
     position: absolute;
-    width: 99.1%;
+    width: 500px;
     background: #EEEEEE;
     display: none;
     overflow-y: auto;
@@ -92,6 +92,10 @@ html, body {
 }
 
 .options-list li:hover {
+    background: #508c9b33;
+    color: #26235d
+}
+.options-list li.active-option {
     background: #508c9b33;
     color: #26235d
 }
