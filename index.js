@@ -44,44 +44,56 @@ document.querySelectorAll("input[name='filterMode']").forEach(input => {
 const colors = [...new Set(data.map(item => item.color))];
 const shapes = [...new Set(data.map(item => item.shape))];
 
-const allTags = [
-    ...colors.map(color => ({ type: "color", value: color })),
-    ...shapes.map(shape => ({ type: "shape", value: shape }))
-];
-
-
-const displayGrid = () => {
-    gridContainer.innerHTML = "";
-
-    let filteredData = data.filter(item => {
-        const nameMatch = selectedNames.length === 0 || selectedNames.includes(item.name);
-        const colorMatch = selectedTags.color.length === 0 || selectedTags.color.includes(item.color);
-        const shapeMatch = selectedTags.shape.length === 0 || selectedTags.shape.includes(item.shape);
-
-      
-        if (selectedNames.length === 0 && selectedTags.color.length === 0 && selectedTags.shape.length === 0) {
-            return true; // Show all items initially
-        }
-
-        if (filterMode === "strict") {
-            return nameMatch && colorMatch && shapeMatch;
-        } else {
-            return nameMatch || (colorMatch && shapeMatch);
-        }
+const generateCombinations = () => {
+    const combinations = [];
+    colors.forEach(color => {
+        shapes.forEach(shape => {
+            combinations.push({ type: "combination", value: `${color} & ${shape}` });
+            combinations.push({ type: "combination", value: `${color} | ${shape}` });
+        });
     });
-    
-    filteredData.forEach(item => {
-        const card = document.createElement("div");
-        card.classList.add("card");
-        card.innerHTML = `
-            <h3>${item.name}</h3>
-            <p>Color: ${item.color}</p>
-            <p>Shape: ${item.shape}</p>
-            <p>Price: $${item.price.toFixed(2)}</p>
-        `;
-        gridContainer.appendChild(card);
-    });
+    return combinations;
 };
+
+const allTags = [...data.map(item => ({ type: "name", value: item.name })),
+    ...colors.map(color => ({ type: "color", value: color })),
+    ...shapes.map(shape => ({ type: "shape", value: shape })),
+    ...generateCombinations()];
+
+
+
+    const displayGrid = () => {
+        gridContainer.innerHTML = "";
+    
+        let filteredData = data.filter(item => {
+            const nameMatch = selectedNames.length === 0 || selectedNames.some(name => {
+                if (name.includes("AND") || name.includes("OR")) {
+                    const [tag1, operator, tag2] = name.split(" ");
+                    const colorMatch = item.color.toLowerCase() === tag1 || item.shape.toLowerCase() === tag1;
+                    const secondMatch = item.color.toLowerCase() === tag2 || item.shape.toLowerCase() === tag2;
+                    return operator === "AND" ? colorMatch && secondMatch : colorMatch || secondMatch;
+                }
+                return item.name.toLowerCase() === name.toLowerCase();
+            });
+    
+            const colorMatch = selectedTags.color.length === 0 || selectedTags.color.includes(item.color);
+            const shapeMatch = selectedTags.shape.length === 0 || selectedTags.shape.includes(item.shape);
+    
+            return selectedNames.length === 0 && selectedTags.color.length === 0 && selectedTags.shape.length === 0 ? true : (filterMode === "strict" ? nameMatch && colorMatch && shapeMatch : nameMatch || (colorMatch && shapeMatch));
+        });
+    
+        filteredData.forEach(item => {
+            const card = document.createElement("div");
+            card.classList.add("card");
+            card.innerHTML = `
+                <h3>${item.name}</h3>
+                <p>Color: ${item.color}</p>
+                <p>Shape: ${item.shape}</p>
+                <p>Price: $${item.price.toFixed(2)}</p>
+            `;
+            gridContainer.appendChild(card);
+        });
+    };
 
 displayGrid();
 
@@ -89,30 +101,20 @@ displayGrid();
 input.addEventListener("input", () => {
     const search = input.value.toLowerCase();
     optionsList.innerHTML = "";
-    currentIndex = -1;
 
     if (search) {
-        const nameResults = data
-            .filter(item => item.name.toLowerCase().includes(search))
-            .map(item => ({ type: "name", value: item.name, id: item.id }));
+        const results = allTags.filter(tag => tag.value.toLowerCase().includes(search));
 
-        const tagResults = allTags.filter(tag => tag.value.toLowerCase().includes(search));
-
-        const combinedResults = [...nameResults, ...tagResults];
-
-        if (combinedResults.length > 0) {
+        if (results.length > 0) {
             optionsList.style.display = "block";
             inputBox.classList.add("active");
-
-            combinedResults.forEach((item, index) => {
+            results.forEach(item => {
                 const li = document.createElement("li");
-                li.textContent = item.type === "name" ? item.value : `${item.value} (${item.type})`;
-                li.dataset.index = index;
-                li.dataset.type = item.type;
-                li.dataset.id = item.id || null;
-
+                li.textContent = item.value;
                 li.addEventListener("click", () => {
-                    if (item.type === "name") {
+                    if (item.type === "combination") {
+                        handleCombination(item.value);
+                    } else if (item.type === "name") {
                         addNameFilter(item);
                     } else {
                         addTag(item);
@@ -121,7 +123,6 @@ input.addEventListener("input", () => {
                     optionsList.style.display = "none";
                     inputBox.classList.remove("active");
                 });
-
                 optionsList.appendChild(li);
             });
         } else {
@@ -134,24 +135,24 @@ input.addEventListener("input", () => {
     }
 });
 
-const addNameFilter = (item) => {
-    if (!selectedNames.includes(item.value)) {
-        selectedNames.push(item.value);
-
-        const tagElement = document.createElement("div");
-        tagElement.classList.add("tag");
-        tagElement.innerHTML = `${item.value} <span>&times;</span>`;
-
-        tagElement.addEventListener("click", function () {
-            removeNameFilter(item.value, tagElement);
-        });
-
-        inputBox.insertBefore(tagElement, input);
-        input.focus();
-
-        displayGrid();
-    }
-};
+    const addNameFilter = (item) => {
+        if (!selectedNames.includes(item.value)) {
+            selectedNames.push(item.value);
+    
+            const tagElement = document.createElement("div");
+            tagElement.classList.add("tag");
+            tagElement.innerHTML = `${item.value} <span>&times;</span>`;
+    
+            tagElement.addEventListener("click", function () {
+                removeNameFilter(item.value, tagElement);
+            });
+    
+            inputBox.insertBefore(tagElement, input);
+            input.focus();
+    
+            displayGrid();
+        }
+    }; 
 
 const removeNameFilter = (value, tagElement) => {
     selectedNames = selectedNames.filter(name => name !== value);
@@ -184,6 +185,32 @@ const removeTag = (type, value, tagElement) => {
     displayGrid();
 };
 
+
+const handleCombination = (inputValue) => {
+    const combinationMatch = inputValue.match(/([a-zA-Z]+)\s*(&|\|)\s*([a-zA-Z]+)/);
+    if (combinationMatch) {
+        const tag1 = combinationMatch[1].toLowerCase();
+        const operator = combinationMatch[2] === "&" ? "AND" : "OR";
+        const tag2 = combinationMatch[3].toLowerCase();
+
+        const combinationTag = `${tag1} ${operator} ${tag2}`;
+        if (!selectedNames.includes(combinationTag)) {
+            selectedNames.push(combinationTag);
+
+            const tagElement = document.createElement("div");
+            tagElement.classList.add("tag");
+            tagElement.innerHTML = `${combinationTag} <span>&times;</span>`;
+
+            tagElement.addEventListener("click", function () {
+                removeNameFilter(combinationTag, tagElement);
+            });
+
+            inputBox.insertBefore(tagElement, input);
+            input.focus();
+            displayGrid();
+        }
+    }
+};
 
 const updateActiveItem = (listItems) => {
     listItems.forEach((item, index) => {
@@ -241,8 +268,9 @@ const handleInvalidInput = (inputValue) => {
     const isNameMatch = data.some(item => item.name.toLowerCase() === inputValue.toLowerCase());
     const isColorMatch = colors.some(color => color.toLowerCase() === inputValue.toLowerCase());
     const isShapeMatch = shapes.some(shape => shape.toLowerCase() === inputValue.toLowerCase());
+    const isCombinationMatch = /([a-zA-Z]+)\s*(&|\|)\s*([a-zA-Z]+)/.test(inputValue);
 
-    if (!isNameMatch && !isColorMatch && !isShapeMatch) {
+    if (!isNameMatch && !isColorMatch && !isShapeMatch && !isCombinationMatch) {
         showErrorMessage("No match found");
         input.value = "";
     }
@@ -279,73 +307,3 @@ document.addEventListener("click", function (e) {
         inputBox.classList.remove("active"); 
     }
 });
-
-// const displayGrid = () => {
-//     gridContainer.innerHTML = "";
-
-//     let filteredData = data.filter(item => {
-//         const nameMatch = selectedNames.length === 0 || selectedNames.includes(item.name);
-//         const colorMatch = selectedTags.color.length === 0 || selectedTags.color.includes(item.color);
-//         const shapeMatch = selectedTags.shape.length === 0 || selectedTags.shape.includes(item.shape);
-
-//         return nameMatch || (colorMatch && shapeMatch);
-//     });
-
-//     filteredData.forEach(item => {
-//         const card = document.createElement("div");
-//         card.classList.add("card");
-//         card.innerHTML = `
-//             <h3>${item.name}</h3>
-//             <p>Color: ${item.color}</p>
-//             <p>Shape: ${item.shape}</p>
-//             <p>Price: $${item.price.toFixed(2)}</p>
-//         `;
-//         gridContainer.appendChild(card);
-//     });
-// };
-
-
-
-// const updateActiveItem = (listItems) => {
-//     listItems.forEach((item, index) => {
-//         if (index === currentIndex) {
-//             item.classList.add("active-option");
-//         } else {
-//             item.classList.remove("active-option");
-//         }
-//     });
-// };
-
-// document.addEventListener("click", function (e) {
-//     if (!inputBox.contains(e.target)) {
-//         optionsList.style.display = "none";
-//         inputBox.classList.remove("active");
-//     }
-// });
-
-// input.addEventListener("keydown", function (e) {
-//     const listItems = optionsList.querySelectorAll("li");
-
-//     if (e.key === "ArrowDown") {
-//         e.preventDefault();
-//         if (currentIndex < listItems.length - 1) {
-//             currentIndex++;
-//         } else {
-//             currentIndex = 0;
-//         }
-//         updateActiveItem(listItems);
-//     } else if (e.key === "ArrowUp") {
-//         e.preventDefault();
-//         if (currentIndex > 0) {
-//             currentIndex--;
-//         } else {
-//             currentIndex = listItems.length - 1;
-//         }
-//         updateActiveItem(listItems);
-//     } else if (e.key === "Enter") {
-//         e.preventDefault();
-//         if (currentIndex >= 0 && listItems[currentIndex]) {
-//             listItems[currentIndex].click();
-//         }
-//     }
-// });
