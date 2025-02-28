@@ -16,59 +16,92 @@ const data = [
     { id: 15, name: "Quince", category: "Fruit", color: "Yellow",shape: "Long", price: 3.2 }
 ];
 
-
 const inputBox = document.getElementById("inputBox");
 const input = document.getElementById("autocompleteInput");
 const optionsList = document.getElementById("optionsList");
 const gridContainer = document.getElementById("gridContainer");
 
-let selectedTags = { color: [], shape: [] };
-let selectedNames = [];
+let selectedFilters = [];
 let currentIndex = -1;
 
-const filterIcon = document.getElementById("filterIcon");
-const filterSettings = document.getElementById("filterSettings");
-let filterMode = "strict"; 
+// Get all available filters
+const generateBaseOptions = () => {
+    const names = [...new Set(data.map(item => item.name))];
+    const colors = [...new Set(data.map(item => item.color))];
+    const shapes = [...new Set(data.map(item => item.shape))];
 
-filterIcon.addEventListener("click", () => {
-    filterSettings.style.display = filterSettings.style.display === "block" ? "none" : "block";
-});
+    return [
+        ...names.map(name => ({ type: 'name', value: name })),
+        ...colors.map(color => ({ type: 'property', value: color })),
+        ...shapes.map(shape => ({ type: 'property', value: shape }))
+    ];
+};
 
-document.querySelectorAll("input[name='filterMode']").forEach(input => {
-    input.addEventListener("change", (e) => {
-        filterMode = e.target.value;
-        displayGrid();
-    });
-});
+let allTags = generateBaseOptions();
 
-const colors = [...new Set(data.map(item => item.color))];
-const shapes = [...new Set(data.map(item => item.shape))];
+const isValidFilter = (value) => {
+    const colors = new Set(data.map(item => item.color));
+    const shapes = new Set(data.map(item => item.shape));
 
-const allTags = [
-    ...colors.map(color => ({ type: "color", value: color })),
-    ...shapes.map(shape => ({ type: "shape", value: shape }))
-];
+    if (value.includes('|')) {
+        const parts = value.split('|');
+        if (parts.length < 2) return false;
+        return parts.every(part => {
+            const trimmedPart = part.trim();
+            return [...colors, ...shapes].some(prop => 
+                prop.toLowerCase() === trimmedPart.toLowerCase()
+            );
+        });
+    } else {
+        return [...colors, ...shapes].some(prop => 
+            prop.toLowerCase() === value.toLowerCase()
+        );
+    }
+};
 
+const getDisplayText = (item) => {
+    const normalizedValue = normalizeFilterValue(item.value);
+    if (item.type === 'name') {
+        return `${normalizedValue} (fruit)`;
+    } else if (item.type === 'property') {
+        const isColor = data.some(d => d.color.toLowerCase() === item.value.toLowerCase());
+        return `${normalizedValue} (${isColor ? 'color' : 'shape'})`;
+    } else {
+        return normalizedValue;
+    }
+};
 
 const displayGrid = () => {
     gridContainer.innerHTML = "";
+    
+    let filteredData = data;
+    
+    if (selectedFilters.length > 0) {
+        const nameFilters = selectedFilters.filter(f => f.type === 'name');
+        const propertyFilters = selectedFilters.filter(f => f.type === 'property');
+        const concatFilters = selectedFilters.filter(f => f.type === 'concat');
 
-    let filteredData = data.filter(item => {
-        const nameMatch = selectedNames.length === 0 || selectedNames.includes(item.name);
-        const colorMatch = selectedTags.color.length === 0 || selectedTags.color.includes(item.color);
-        const shapeMatch = selectedTags.shape.length === 0 || selectedTags.shape.includes(item.shape);
+        filteredData = data.filter(item => {
+            const matchesName = nameFilters.some(filter => 
+                item.name.toLowerCase() === filter.value.toLowerCase()
+            );
 
-      
-        if (selectedNames.length === 0 && selectedTags.color.length === 0 && selectedTags.shape.length === 0) {
-            return true; // Show all items initially
-        }
+            const matchesProperty = propertyFilters.some(filter => 
+                item.color.toLowerCase() === filter.value.toLowerCase() || 
+                item.shape.toLowerCase() === filter.value.toLowerCase()
+            );
 
-        if (filterMode === "strict") {
-            return nameMatch && colorMatch && shapeMatch;
-        } else {
-            return nameMatch || (colorMatch && shapeMatch);
-        }
-    });
+            const allConcatAttributes = concatFilters.flatMap(filter => 
+                filter.value.split('|').map(part => part.trim())
+            );
+            const matchesConcat = allConcatAttributes.some(attr => 
+                item.color.toLowerCase() === attr.toLowerCase() || 
+                item.shape.toLowerCase() === attr.toLowerCase()
+            );
+
+            return matchesName || matchesProperty || matchesConcat;
+        });
+    }
     
     filteredData.forEach(item => {
         const card = document.createElement("div");
@@ -85,43 +118,47 @@ const displayGrid = () => {
 
 displayGrid();
 
-
 input.addEventListener("input", () => {
-    const search = input.value.toLowerCase();
+    const search = input.value;
     optionsList.innerHTML = "";
-    currentIndex = -1;
 
     if (search) {
-        const nameResults = data
-            .filter(item => item.name.toLowerCase().includes(search))
-            .map(item => ({ type: "name", value: item.name, id: item.id }));
+        let results = [];
+        
+        // Check if input is a valid filter
+        if (isValidFilter(search)) {
+            if (!selectedFilters.some(f => f.value === search)) {
+                results.push({
+                    type: search.includes('|') ? 'concat' : 'property',
+                    value: search,
+                    isNew: search.includes('|')
+                });
+            }
+        } else {
+            
+            results = allTags.filter(tag => 
+                !selectedFilters.some(selected => selected.value === tag.value) &&
+                tag.value.toLowerCase().includes(search.toLowerCase())
+            );
+        }
 
-        const tagResults = allTags.filter(tag => tag.value.toLowerCase().includes(search));
-
-        const combinedResults = [...nameResults, ...tagResults];
-
-        if (combinedResults.length > 0) {
+        if (results.length > 0) {
             optionsList.style.display = "block";
             inputBox.classList.add("active");
-
-            combinedResults.forEach((item, index) => {
+            results.forEach(item => {
                 const li = document.createElement("li");
-                li.textContent = item.type === "name" ? item.value : `${item.value} (${item.type})`;
-                li.dataset.index = index;
-                li.dataset.type = item.type;
-                li.dataset.id = item.id || null;
-
+                const displayText = getDisplayText(item);
+                if (item.type === 'concat' && item.isNew) {
+                    li.innerHTML = `<i class="fa fa-plus"></i> ${displayText}`;
+                } else {
+                    li.textContent = displayText;
+                }
                 li.addEventListener("click", () => {
-                    if (item.type === "name") {
-                        addNameFilter(item);
-                    } else {
-                        addTag(item);
-                    }
+                    addFilter(item);
                     input.value = "";
                     optionsList.style.display = "none";
                     inputBox.classList.remove("active");
                 });
-
                 optionsList.appendChild(li);
             });
         } else {
@@ -134,56 +171,47 @@ input.addEventListener("input", () => {
     }
 });
 
-const addNameFilter = (item) => {
-    if (!selectedNames.includes(item.value)) {
-        selectedNames.push(item.value);
+const normalizeFilterValue = (value) => {
+    const capitalize = (str) => str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+    
+    if (value.includes('|')) {
+        return value.split('|')
+            .map(part => part.trim())
+            .map(capitalize)
+            .join(' | ');
+    }
+    return capitalize(value);
+};
 
+const addFilter = (filter) => {
+    const normalizedValue = normalizeFilterValue(filter.value);
+    if (!selectedFilters.some(f => normalizeFilterValue(f.value) === normalizedValue)) {
+        selectedFilters.push({
+            ...filter,
+            value: normalizedValue
+        });
+        
         const tagElement = document.createElement("div");
         tagElement.classList.add("tag");
-        tagElement.innerHTML = `${item.value} <span>&times;</span>`;
-
-        tagElement.addEventListener("click", function () {
-            removeNameFilter(item.value, tagElement);
+        tagElement.innerHTML = `${normalizedValue} <span>&times;</span>`;
+        
+        tagElement.addEventListener("click", function() {
+            removeFilter(filter, tagElement);
         });
-
+        
         inputBox.insertBefore(tagElement, input);
         input.focus();
-
+        
         displayGrid();
     }
 };
 
-const removeNameFilter = (value, tagElement) => {
-    selectedNames = selectedNames.filter(name => name !== value);
+const removeFilter = (filter, tagElement) => {
+    const normalizedValue = normalizeFilterValue(filter.value);
+    selectedFilters = selectedFilters.filter(f => normalizeFilterValue(f.value) !== normalizedValue);
     tagElement.remove();
     displayGrid();
 };
-
-const addTag = (tag) => {
-    if (!selectedTags[tag.type].includes(tag.value)) {
-        selectedTags[tag.type].push(tag.value);
-
-        const tagElement = document.createElement("div");
-        tagElement.classList.add("tag");
-        tagElement.innerHTML = `${tag.value} <span>&times;</span>`;
-
-        tagElement.addEventListener("click", function () {
-            removeTag(tag.type, tag.value, tagElement);
-        });
-
-        inputBox.insertBefore(tagElement, input);
-        input.focus();
-
-        displayGrid();
-    }
-};
-
-const removeTag = (type, value, tagElement) => {
-    selectedTags[type] = selectedTags[type].filter(tag => tag !== value);
-    tagElement.remove();
-    displayGrid();
-};
-
 
 const updateActiveItem = (listItems) => {
     listItems.forEach((item, index) => {
@@ -210,26 +238,27 @@ input.addEventListener("keydown", function (e) {
         e.preventDefault();
         if (currentIndex >= 0 && listItems[currentIndex]) {
             listItems[currentIndex].click();
+        } else if (isValidFilter(input.value)) {
+            addFilter({
+                type: input.value.includes('|') ? 'concat' : 'property',
+                value: input.value,
+                isNew: input.value.includes('|')
+            });
+            input.value = "";
+            optionsList.style.display = "none";
+            inputBox.classList.remove("active");
         } else {
-            handleInvalidInput(input.value)
+            handleInvalidInput(input.value);
         }
     } else if (e.key === "Backspace" && input.value === "") {
         const lastTag = inputBox.querySelector(".tag:last-of-type");
         if (lastTag) {
             const tagText = lastTag.textContent.replace(" ×", "");
+            const normalizedText = normalizeFilterValue(tagText);
             lastTag.remove();
-
-            if (selectedNames.includes(tagText)) {
-                selectedNames = selectedNames.filter(name => name !== tagText);
-            } else if (selectedTags.color.includes(tagText)) {
-                selectedTags.color = selectedTags.color.filter(color => color !== tagText);
-            } else if (selectedTags.shape.includes(tagText)) {
-                selectedTags.shape = selectedTags.shape.filter(shape => shape !== tagText);
-            }
-
+            selectedFilters = selectedFilters.filter(f => normalizeFilterValue(f.value) !== normalizedText);
             input.value = tagText;
             input.focus();
-
             displayGrid();
         }
     }
@@ -239,16 +268,13 @@ const handleInvalidInput = (inputValue) => {
     if (!inputValue.trim()) return;
 
     const isNameMatch = data.some(item => item.name.toLowerCase() === inputValue.toLowerCase());
-    const isColorMatch = colors.some(color => color.toLowerCase() === inputValue.toLowerCase());
-    const isShapeMatch = shapes.some(shape => shape.toLowerCase() === inputValue.toLowerCase());
+    const isValidFilterMatch = isValidFilter(inputValue);
 
-    if (!isNameMatch && !isColorMatch && !isShapeMatch) {
+    if (!isNameMatch && !isValidFilterMatch) {
         showErrorMessage("No match found");
         input.value = "";
     }
 };
-
-const searchIcon = document.querySelector(".search-icon"); 
 
 const showErrorMessage = (message) => {
     let errorDiv = document.getElementById("error-message");
@@ -258,18 +284,16 @@ const showErrorMessage = (message) => {
         errorDiv.id = "error-message";
         errorDiv.style.color = "red";
         errorDiv.style.fontSize = "16px";
-        errorDiv.style.fontWeight= "bold";
+        errorDiv.style.fontWeight = "bold";
         inputBox.appendChild(errorDiv);
     }
 
     errorDiv.textContent = message;
-    searchIcon.style.display = "none";
 
     setTimeout(() => {
         if (errorDiv) {
             errorDiv.remove();
         }
-        searchIcon.style.display = "inline-block";
     }, 2000);
 };
 
@@ -279,73 +303,3 @@ document.addEventListener("click", function (e) {
         inputBox.classList.remove("active"); 
     }
 });
-
-// const displayGrid = () => {
-//     gridContainer.innerHTML = "";
-
-//     let filteredData = data.filter(item => {
-//         const nameMatch = selectedNames.length === 0 || selectedNames.includes(item.name);
-//         const colorMatch = selectedTags.color.length === 0 || selectedTags.color.includes(item.color);
-//         const shapeMatch = selectedTags.shape.length === 0 || selectedTags.shape.includes(item.shape);
-
-//         return nameMatch || (colorMatch && shapeMatch);
-//     });
-
-//     filteredData.forEach(item => {
-//         const card = document.createElement("div");
-//         card.classList.add("card");
-//         card.innerHTML = `
-//             <h3>${item.name}</h3>
-//             <p>Color: ${item.color}</p>
-//             <p>Shape: ${item.shape}</p>
-//             <p>Price: $${item.price.toFixed(2)}</p>
-//         `;
-//         gridContainer.appendChild(card);
-//     });
-// };
-
-
-
-// const updateActiveItem = (listItems) => {
-//     listItems.forEach((item, index) => {
-//         if (index === currentIndex) {
-//             item.classList.add("active-option");
-//         } else {
-//             item.classList.remove("active-option");
-//         }
-//     });
-// };
-
-// document.addEventListener("click", function (e) {
-//     if (!inputBox.contains(e.target)) {
-//         optionsList.style.display = "none";
-//         inputBox.classList.remove("active");
-//     }
-// });
-
-// input.addEventListener("keydown", function (e) {
-//     const listItems = optionsList.querySelectorAll("li");
-
-//     if (e.key === "ArrowDown") {
-//         e.preventDefault();
-//         if (currentIndex < listItems.length - 1) {
-//             currentIndex++;
-//         } else {
-//             currentIndex = 0;
-//         }
-//         updateActiveItem(listItems);
-//     } else if (e.key === "ArrowUp") {
-//         e.preventDefault();
-//         if (currentIndex > 0) {
-//             currentIndex--;
-//         } else {
-//             currentIndex = listItems.length - 1;
-//         }
-//         updateActiveItem(listItems);
-//     } else if (e.key === "Enter") {
-//         e.preventDefault();
-//         if (currentIndex >= 0 && listItems[currentIndex]) {
-//             listItems[currentIndex].click();
-//         }
-//     }
-// });
